@@ -10,10 +10,15 @@ import {
   Icon,
   IconButton,
   useColorModeValue,
+  HStack,
+  Tooltip,
+  Card,
+  CardBody,
 } from "@chakra-ui/react";
-import { EditIcon } from "@chakra-ui/icons";
+import { EditIcon, LinkIcon } from "@chakra-ui/icons";
 import { FaPaperPlane } from "react-icons/fa";
 import ResponseActions from "./ResponseActions";
+import DocumentReferenceButton from "./DocumentReferenceButton";
 
 const ChatWindow = ({ chatId }) => {
   const [messages, setMessages] = useState([]);
@@ -21,6 +26,7 @@ const ChatWindow = ({ chatId }) => {
   const [editingId, setEditingId] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const [isSimulatingTyping, setIsSimulatingTyping] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -37,7 +43,13 @@ const ChatWindow = ({ chatId }) => {
     }
   }, [input]);
 
-  // Раскомментированный вариант sendMessage, который обращается к API PaperQA
+  const handleSelectDocument = (document) => {
+    setSelectedDocument(document);
+    // Optional: automatically add reference to the input
+    const documentReference = `[Referencing document: ${document.name}]\n`;
+    setInput((prevInput) => documentReference + prevInput);
+  };
+
   const sendMessage = async () => {
     if (input.trim()) {
       if (editingId) {
@@ -48,29 +60,64 @@ const ChatWindow = ({ chatId }) => {
         );
         setEditingId(null);
       } else {
-        const newUserMessage = { id: Date.now(), text: input, sender: "user" };
+        let messageContent = input;
+
+        // Include document reference if it exists
+        if (selectedDocument) {
+          messageContent = `${messageContent}\n\n[Referencing document: ${selectedDocument.name}]`;
+        }
+
+        const newUserMessage = {
+          id: Date.now(),
+          text: messageContent,
+          sender: "user",
+          documentRef: selectedDocument ? {
+            id: selectedDocument.id,
+            name: selectedDocument.name
+          } : null
+        };
+
         setMessages((prevMessages) => [...prevMessages, newUserMessage]);
+        setIsTyping(true);
+
+        // Clear document selection after sending
+        setSelectedDocument(null);
 
         try {
-          // Отправка запроса на API PaperQA
-          const response = await axios.post(
-              "http://localhost:8000/ai_prompt", // Измените этот URL при необходимости
-              {},
+          // Use GET request as shown in the server log
+          const response = await axios.get(
+            "http://localhost:8000/ai_prompt",
               {
-                params: { prompt: input },
+              params: {
+                prompt: input,
+                // Only pass document ID if we have a selected document
+                // The server appears to expect use_docs parameter
+                use_docs: selectedDocument ? true : true
+              },
               }
           );
 
-          // Обработка ответа от сервера
+          // Handle response
+          const responseText = response.data.response || response.data;
           const newAIMessage = {
             id: Date.now(),
-            text: response.data, // Если API возвращает JSON, возможно, нужно использовать response.data.answer или подобное
+            text: responseText,
             sender: "ai",
+            source: response.data.source || "api"
           };
           setMessages((prevMessages) => [...prevMessages, newAIMessage]);
         } catch (error) {
           console.error("Error sending message to AI API:", error);
-          // Здесь можно добавить сообщение об ошибке в чат
+          // Add error message
+          const errorMessage = {
+            id: Date.now(),
+            text: `Error: ${error.message || "Failed to get response"}`,
+            sender: "ai",
+            isError: true
+          };
+          setMessages((prevMessages) => [...prevMessages, errorMessage]);
+        } finally {
+          setIsTyping(false);
         }
       }
       setInput("");
@@ -84,9 +131,7 @@ const ChatWindow = ({ chatId }) => {
     }
   };
 
-  // Если не хотите использовать API и хотите оставить симуляцию, можно переключаться между вариантами,
-  // например, используя условный оператор или комментарии.
-
+  // Sample patient profile simulation
   const simulateTyping = () => {
     if (isSimulatingTyping) return;
 
@@ -116,6 +161,7 @@ Age: 42 years old
   const buttonBg = useColorModeValue("blue.500", "blue.200");
   const buttonColor = useColorModeValue("white", "gray.800");
   const buttonHoverBg = useColorModeValue("blue.600", "blue.300");
+  const documentRefBg = useColorModeValue("blue.50", "blue.900");
 
   return (
       <Flex flexDirection="column" height="100%">
@@ -145,19 +191,40 @@ Age: 42 years old
                         transform="translateY(-50%)"
                         opacity={0.5}
                         _hover={{ opacity: 1 }}
-                        onClick={() => setEditingId(message.id) || setInput(message.text)}
+                onClick={() => {
+                  setEditingId(message.id);
+                  // When editing, only set the original input, not the document reference
+                  const textWithoutRef = message.text.split('\n\n[Referencing')[0];
+                  setInput(textWithoutRef);
+                }}
                     />
                 )}
                 <Box
-                    bg={message.sender === "user" ? "blue.500" : "gray.200"}
-                    color={message.sender === "user" ? "white" : "black"}
-                    p={2}
+              bg={message.sender === "user" ? "blue.500" : message.isError ? "red.500" : "gray.200"}
+              color={message.sender === "user" || message.isError ? "white" : "black"}
+              p={3}
                     borderRadius="md"
                     whiteSpace="pre-wrap"
+              maxW="90%"
                 >
                   <Text>{message.text}</Text>
+
+              {/* Show document reference badge if exists */}
+              {message.documentRef && (
+                <Flex
+                  mt={2}
+                  p={1}
+                  bg={documentRefBg}
+                  borderRadius="md"
+                  alignItems="center"
+                  fontSize="sm"
+                >
+                  <Icon as={LinkIcon} mr={1} />
+                  <Text>Document: {message.documentRef.name}</Text>
+                </Flex>
+              )}
                 </Box>
-                {message.sender === "ai" && !isTyping && (
+            {message.sender === "ai" && !isTyping && !message.isError && (
                     <ResponseActions responseText={message.text} />
                 )}
               </Box>
@@ -169,13 +236,35 @@ Age: 42 years old
           )}
           <div ref={messagesEndRef} />
         </VStack>
+
+      {/* Selected document preview */}
+      {selectedDocument && (
+        <Card size="sm" mx={4} mb={2} bg={documentRefBg}>
+          <CardBody py={2}>
+            <Flex justifyContent="space-between" alignItems="center">
+              <Flex alignItems="center">
+                <Icon as={LinkIcon} mr={2} />
+                <Text fontWeight="medium">
+                  Using document: {selectedDocument.name}
+                </Text>
+              </Flex>
+              <IconButton
+                icon={<EditIcon />}
+                size="xs"
+                aria-label="Clear document selection"
+                onClick={() => setSelectedDocument(null)}
+              />
+            </Flex>
+          </CardBody>
+        </Card>
+      )}
+
         <Flex p={4} borderTop="1px" borderColor="gray.200" alignItems="flex-end">
           <Textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              onClick={simulateTyping}
               placeholder={
                 editingId ? "Edit your message..." : "Message MDSGene AI..."
               }
@@ -186,7 +275,10 @@ Age: 42 years old
               resize="none"
               overflowY="auto"
               readOnly={isSimulatingTyping}
+          onClick={simulateTyping}
           />
+        <VStack alignItems="stretch" spacing={2}>
+          <DocumentReferenceButton onSelectDocument={handleSelectDocument} />
           <Button
               onClick={sendMessage}
               bg={buttonBg}
@@ -198,6 +290,7 @@ Age: 42 years old
           >
             <Icon as={FaPaperPlane} />
           </Button>
+        </VStack>
         </Flex>
       </Flex>
   );
