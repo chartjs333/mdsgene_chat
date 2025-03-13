@@ -49,7 +49,7 @@ const FileUploadComponent = ({ isOpen, onClose }) => {
     const fetchDocuments = async () => {
         setIsLoading(true);
         try {
-            const response = await axios.get("http://localhost:8000/documents");
+            const response = await axios.get("http://34.90.8.7:8000/documents");
 
       // Format data from the server response
       // The server returns documents in two arrays: paperqa_docs and backup_docs
@@ -111,7 +111,7 @@ const FileUploadComponent = ({ isOpen, onClose }) => {
         try {
       // Use the exact format that works with curl
             const response = await axios.post(
-                "http://localhost:8000/upload_document",
+                "http://34.90.8.7:8000/upload_document",
                 formData,
                 {
                     headers: {
@@ -157,7 +157,7 @@ const FileUploadComponent = ({ isOpen, onClose }) => {
 
     const handleDeleteDocument = async (docId) => {
         try {
-            await axios.delete(`http://localhost:8000/documents/${docId}`);
+            await axios.delete(`http://34.90.8.7:8000/documents/${docId}`);
 
             toast({
                 title: "Document deleted",
@@ -182,7 +182,7 @@ const FileUploadComponent = ({ isOpen, onClose }) => {
 
     const handleViewDocument = async (docId) => {
         try {
-            const response = await axios.get(`http://localhost:8000/document/${docId}`);
+            const response = await axios.get(`http://34.90.8.7:8000/document/${docId}`);
 
             toast({
                 title: response.data.name,

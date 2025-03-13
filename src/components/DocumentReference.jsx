@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from "react";
 import {
-    IconButton,
     Menu,
     MenuButton,
     MenuList,
     MenuItem,
-    Tooltip,
+    IconButton,
     Text,
-    Badge,
     Flex,
-    Spinner,
     Icon,
+    Badge,
+    Spinner,
     MenuDivider,
     useColorModeValue,
 } from "@chakra-ui/react";
@@ -18,11 +17,12 @@ import { AttachmentIcon } from "@chakra-ui/icons";
 import { FaFile } from "react-icons/fa";
 import axios from "axios";
 
-const DocumentReferenceButton = ({ onSelectDocument }) => {
+const DocumentReference = ({ onSelectDocument }) => {
     const [documents, setDocuments] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const menuBg = useColorModeValue("white", "gray.700");
 
+    // Fetch documents when component mounts
     useEffect(() => {
         fetchDocuments();
     }, []);
@@ -30,22 +30,21 @@ const DocumentReferenceButton = ({ onSelectDocument }) => {
     const fetchDocuments = async () => {
         setIsLoading(true);
         try {
-            const response = await axios.get("http://localhost:8000/documents");
+            const response = await axios.get("http://34.90.8.7:8000/documents");
 
-      // Format data from the server response
-      // The server returns documents in two arrays: paperqa_docs and backup_docs
-      let allDocs = [];
+            // Format data from the server response
+            let allDocs = [];
 
-      if (response.data.documents) {
-        allDocs = response.data.documents;
-      } else {
-        // Fallback handling if structure is different
-        const backupDocs = response.data.backup_docs || [];
-        const paperqaDocs = response.data.paperqa_docs || [];
-        allDocs = [...backupDocs, ...paperqaDocs];
-      }
+            if (response.data.documents) {
+                allDocs = response.data.documents;
+            } else {
+                // Fallback handling if structure is different
+                const backupDocs = response.data.backup_docs || [];
+                const paperqaDocs = response.data.paperqa_docs || [];
+                allDocs = [...backupDocs, ...paperqaDocs];
+            }
 
-      setDocuments(allDocs);
+            setDocuments(allDocs);
         } catch (error) {
             console.error("Error fetching documents:", error);
         } finally {
@@ -55,7 +54,7 @@ const DocumentReferenceButton = ({ onSelectDocument }) => {
 
     const handleSelectDocument = async (docId) => {
         try {
-            const response = await axios.get(`http://localhost:8000/document/${docId}`);
+            const response = await axios.get(`http://34.90.8.7:8000/document/${docId}`);
             if (onSelectDocument && response.data) {
                 onSelectDocument(response.data);
             }
@@ -66,18 +65,16 @@ const DocumentReferenceButton = ({ onSelectDocument }) => {
 
     return (
         <Menu closeOnSelect={true} placement="top">
-            <Tooltip label="Reference Document" hasArrow placement="top">
-                <MenuButton
-                    as={IconButton}
-                    icon={<AttachmentIcon />}
-                    variant="ghost"
-                    size="md"
-                    aria-label="Reference Document"
-                />
-            </Tooltip>
+            <MenuButton
+                as={IconButton}
+                icon={<AttachmentIcon />}
+                variant="ghost"
+                size="md"
+                aria-label="Reference Document"
+            />
             <MenuList bg={menuBg} maxH="300px" overflowY="auto" minW="240px">
                 <Text px={3} py={2} fontWeight="medium">
-                    Select a document to reference
+                    Reference a document
                 </Text>
                 <MenuDivider />
                 {isLoading ? (
@@ -93,7 +90,7 @@ const DocumentReferenceButton = ({ onSelectDocument }) => {
                         <MenuItem
                             key={doc.id}
                             onClick={() => handleSelectDocument(doc.id)}
-              _hover={{ bg: menuBg === "white" ? "gray.100" : "gray.600" }}
+                            _hover={{ bg: menuBg === "white" ? "gray.100" : "gray.600" }}
                         >
                             <Flex align="center" w="full">
                                 <Icon as={FaFile} mr={2} color="blue.500" />
@@ -108,10 +105,10 @@ const DocumentReferenceButton = ({ onSelectDocument }) => {
                     ))
                 )}
                 <MenuDivider />
-        <MenuItem
-          onClick={fetchDocuments}
-          _hover={{ bg: menuBg === "white" ? "gray.100" : "gray.600" }}
-        >
+                <MenuItem
+                    onClick={fetchDocuments}
+                    _hover={{ bg: menuBg === "white" ? "gray.100" : "gray.600" }}
+                >
                     <Text fontSize="sm">Refresh list</Text>
                 </MenuItem>
             </MenuList>
@@ -119,4 +116,4 @@ const DocumentReferenceButton = ({ onSelectDocument }) => {
     );
 };
 
-export default DocumentReferenceButton;
+export default DocumentReference;

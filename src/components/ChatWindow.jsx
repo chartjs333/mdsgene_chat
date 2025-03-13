@@ -11,14 +11,14 @@ import {
   IconButton,
   useColorModeValue,
   HStack,
-  Tooltip,
   Card,
   CardBody,
+  Badge,
 } from "@chakra-ui/react";
-import { EditIcon, LinkIcon } from "@chakra-ui/icons";
+import { EditIcon, LinkIcon, CloseIcon } from "@chakra-ui/icons";
 import { FaPaperPlane } from "react-icons/fa";
 import ResponseActions from "./ResponseActions";
-import DocumentReferenceButton from "./DocumentReferenceButton";
+import DocumentReference from "./DocumentReference";
 
 const ChatWindow = ({ chatId }) => {
   const [messages, setMessages] = useState([]);
@@ -45,9 +45,6 @@ const ChatWindow = ({ chatId }) => {
 
   const handleSelectDocument = (document) => {
     setSelectedDocument(document);
-    // Optional: automatically add reference to the input
-    const documentReference = `[Referencing document: ${document.name}]\n`;
-    setInput((prevInput) => documentReference + prevInput);
   };
 
   const sendMessage = async () => {
@@ -62,11 +59,7 @@ const ChatWindow = ({ chatId }) => {
       } else {
         let messageContent = input;
 
-        // Include document reference if it exists
-        if (selectedDocument) {
-          messageContent = `${messageContent}\n\n[Referencing document: ${selectedDocument.name}]`;
-        }
-
+        // Create user message with document reference if selected
         const newUserMessage = {
           id: Date.now(),
           text: messageContent,
@@ -80,35 +73,34 @@ const ChatWindow = ({ chatId }) => {
         setMessages((prevMessages) => [...prevMessages, newUserMessage]);
         setIsTyping(true);
 
-        // Clear document selection after sending
-        setSelectedDocument(null);
-
         try {
-          // Use GET request as shown in the server log
+          // We're using a GET request as confirmed to work with your backend
           const response = await axios.get(
-            "http://localhost:8000/ai_prompt",
+            "http://34.90.8.7:8000/ai_prompt",
               {
               params: {
                 prompt: input,
-                // Only pass document ID if we have a selected document
-                // The server appears to expect use_docs parameter
-                use_docs: selectedDocument ? true : true
+                use_docs: true // Use documents by default
               },
               }
           );
 
-          // Handle response
-          const responseText = response.data.response || response.data;
+          // Process response
+          const responseData = response.data;
+          const responseText = typeof responseData === 'string'
+            ? responseData
+            : (responseData.response || JSON.stringify(responseData));
+
           const newAIMessage = {
             id: Date.now(),
             text: responseText,
             sender: "ai",
-            source: response.data.source || "api"
+            source: typeof responseData === 'object' ? responseData.source : "api"
           };
           setMessages((prevMessages) => [...prevMessages, newAIMessage]);
         } catch (error) {
           console.error("Error sending message to AI API:", error);
-          // Add error message
+          // Add error message to chat
           const errorMessage = {
             id: Date.now(),
             text: `Error: ${error.message || "Failed to get response"}`,
@@ -118,9 +110,10 @@ const ChatWindow = ({ chatId }) => {
           setMessages((prevMessages) => [...prevMessages, errorMessage]);
         } finally {
           setIsTyping(false);
+          setSelectedDocument(null); // Clear selected document after sending
+          setInput(""); // Clear input after sending
         }
       }
-      setInput("");
     }
   };
 
@@ -143,19 +136,9 @@ Age: 42 years old
 * Resting tremor: The patient has observed tremors in the hands that are most prominent at rest and decrease with voluntary movements.
 * Rigidity, leg: The patient feels stiffness in the legs that is not dependent on the angle of joint movement.`;
 
-    setIsSimulatingTyping(true);
-    setInput("");
-
-    let i = 0;
-    const typingInterval = setInterval(() => {
-      if (i < textToType.length) {
-        setInput((prevInput) => prevInput + textToType.charAt(i));
-        i++;
-      } else {
-        clearInterval(typingInterval);
-        setIsSimulatingTyping(false);
-      }
-    }, 0); // Настройте скорость набора, изменяя интервал
+    // Instead of simulating character-by-character typing (which seems to cause issues),
+    // let's just set the full text at once
+    setInput(textToType);
   };
 
   const buttonBg = useColorModeValue("blue.500", "blue.200");
@@ -193,9 +176,7 @@ Age: 42 years old
                         _hover={{ opacity: 1 }}
                 onClick={() => {
                   setEditingId(message.id);
-                  // When editing, only set the original input, not the document reference
-                  const textWithoutRef = message.text.split('\n\n[Referencing')[0];
-                  setInput(textWithoutRef);
+                  setInput(message.text);
                 }}
                     />
                 )}
@@ -247,9 +228,14 @@ Age: 42 years old
                 <Text fontWeight="medium">
                   Using document: {selectedDocument.name}
                 </Text>
+                {selectedDocument.source && (
+                  <Badge ml={2} colorScheme={selectedDocument.source === "paperqa" ? "green" : "blue"}>
+                    {selectedDocument.source}
+                  </Badge>
+                )}
               </Flex>
               <IconButton
-                icon={<EditIcon />}
+                icon={<CloseIcon />}
                 size="xs"
                 aria-label="Clear document selection"
                 onClick={() => setSelectedDocument(null)}
@@ -278,7 +264,7 @@ Age: 42 years old
           onClick={simulateTyping}
           />
         <VStack alignItems="stretch" spacing={2}>
-          <DocumentReferenceButton onSelectDocument={handleSelectDocument} />
+          <DocumentReference onSelectDocument={handleSelectDocument} />
           <Button
               onClick={sendMessage}
               bg={buttonBg}
