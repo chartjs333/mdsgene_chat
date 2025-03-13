@@ -23,37 +23,26 @@ import { LinkIcon, CloseIcon } from "@chakra-ui/icons";
 import AddToDatasetModal from "./AddToDatasetModal";
 import DocumentGroups from "./DocumentGroups";
 import ResponseActions from "./ResponseActions";
+import { transformThinkBlocks } from "../utils/textTransform";
 
-// A component to parse message text and render a collapsible "think" block
+// This component parses message text and renders a collapsible block if <think> tags are found.
 const MessageContent = ({ text }) => {
-  // Look for content between <think> and </think> tags
   const regex = /<think>([\s\S]*?)<\/think>/;
   const match = text.match(regex);
+  const [isOpen, setIsOpen] = useState(false);
 
   if (match) {
     const beforeText = text.replace(regex, "").trim();
     const thinkText = match[1].trim();
-    const [isOpen, setIsOpen] = useState(false);
 
     return (
         <Box>
           {beforeText && <Box mb={2}>{beforeText}</Box>}
-          <Button
-              size="xs"
-              variant="link"
-              onClick={() => setIsOpen(!isOpen)}
-              mb={2}
-          >
+          <Button size="xs" variant="link" onClick={() => setIsOpen(!isOpen)} mb={2}>
             {isOpen ? "Hide thoughts" : "Show thoughts"}
           </Button>
           <Collapse in={isOpen} animateOpacity>
-            <Box
-                p={2}
-                border="1px"
-                borderColor="gray.300"
-                borderRadius="md"
-                bg="gray.100"
-            >
+            <Box p={2} border="1px" borderColor="gray.300" borderRadius="md" bg="gray.100">
               {thinkText}
             </Box>
           </Collapse>
@@ -68,10 +57,11 @@ const ChatWindow = ({ chatId }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoadingResponse, setIsLoadingResponse] = useState(false);
-  // States for category selection
+  // States for category and mode selection
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [categories, setCategories] = useState(["All"]);
-  // States for dataset management
+  const [mode, setMode] = useState("paperqa"); // "paperqa" or "direct"
+  // States for dataset
   const [dataset, setDataset] = useState([]);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [selectedForDataset, setSelectedForDataset] = useState("");
@@ -96,7 +86,7 @@ const ChatWindow = ({ chatId }) => {
   }, [input]);
 
   useEffect(() => {
-    // Fetch categories from the server
+    // Fetch categories from the backend
     const fetchCategories = async () => {
       try {
         const res = await fetch("http://localhost:8000/categories");
@@ -115,15 +105,10 @@ const ChatWindow = ({ chatId }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Function to send a message via PaperQA endpoint (/ai_prompt)
-  const sendMessage = async () => {
+  // Sends a message using PaperQA mode (non-streaming)
+  const sendMessagePaperQA = async () => {
     if (!input.trim()) return;
-    // Add user message
-    const userMessage = {
-      id: Date.now(),
-      text: input,
-      sender: "user",
-    };
+    const userMessage = { id: Date.now(), text: input, sender: "user" };
     setMessages((prev) => [...prev, userMessage]);
     setIsLoadingResponse(true);
     const query = input;
@@ -131,28 +116,69 @@ const ChatWindow = ({ chatId }) => {
 
     try {
       const response = await fetch(
-          `http://localhost:8000/ai_prompt?prompt=${encodeURIComponent(
-              query
-          )}&use_docs=true&category=${selectedCategory}`
+          `http://localhost:8000/ai_prompt?prompt=${encodeURIComponent(query)}&use_docs=true&category=${selectedCategory}`
       );
       const data = await response.json();
-      const aiMessage = {
-        id: Date.now(),
-        text: data.response,
-        sender: "ai",
-        category: selectedCategory,
-      };
+      const aiMessage = { id: Date.now(), text: data.response, sender: "ai", category: selectedCategory };
       setMessages((prev) => [...prev, aiMessage]);
     } catch (err) {
-      const errorMessage = {
-        id: Date.now(),
-        text: `Error: ${err.message}`,
-        sender: "ai",
-        isError: true,
-      };
+      const errorMessage = { id: Date.now(), text: `Error: ${err.message}`, sender: "ai", isError: true };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoadingResponse(false);
+    }
+  };
+
+  // Sends a message using Direct Streaming mode (via /ai_prompt_stream)
+  const sendMessageDirect = async () => {
+    if (!input.trim()) return;
+    const userMessage = { id: Date.now(), text: input, sender: "user" };
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoadingResponse(true);
+    const query = input;
+    setInput("");
+    const eventSource = new EventSource(
+        `http://localhost:8000/ai_prompt_stream?prompt=${encodeURIComponent(query)}&use_docs=true&category=${selectedCategory}`
+    );
+
+    let aggregatedResponse = "";
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.done === true) {
+          setIsLoadingResponse(false);
+          eventSource.close();
+        } else {
+          aggregatedResponse += data.response;
+          setMessages((prev) => {
+            const lastIndex = prev.length - 1;
+            const lastMsg = prev[lastIndex];
+            if (lastMsg && lastMsg.sender === "ai") {
+              const updatedMsg = { ...lastMsg, text: aggregatedResponse, category: selectedCategory };
+              return [...prev.slice(0, lastIndex), updatedMsg];
+            } else {
+              return [...prev, { id: Date.now(), text: aggregatedResponse, sender: "ai", category: selectedCategory }];
+            }
+          });
+        }
+      } catch (err) {
+        console.error("JSON parse error:", err);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.error("EventSource error:", err);
+      setIsLoadingResponse(false);
+      eventSource.close();
+    };
+  };
+
+  // Main sendMessage function which chooses the mode based on state
+  const sendMessage = async () => {
+    if (mode === "paperqa") {
+      await sendMessagePaperQA();
+    } else if (mode === "direct") {
+      await sendMessageDirect();
     }
   };
 
@@ -163,7 +189,7 @@ const ChatWindow = ({ chatId }) => {
     }
   };
 
-  // Open modal to add message to dataset
+  // Modal for adding message to dataset
   const handleAddToDataset = (content) => {
     setSelectedForDataset(content);
     onOpen();
@@ -173,17 +199,11 @@ const ChatWindow = ({ chatId }) => {
     setDataset((prev) => [...prev, { content }]);
   };
 
-  // Render individual message with collapsible "think" block
+  // Render each message with collapsible <think> block
   const renderMessage = (message) => {
+    const content = transformThinkBlocks(message.text);
     return (
-        <Box
-            key={message.id}
-            position="relative"
-            alignSelf="center"
-            w="100%"
-            maxW="800px"
-            mb={2}
-        >
+        <Box key={message.id} position="relative" alignSelf="center" w="100%" maxW="800px" mb={2}>
           {message.sender === "user" && (
               <IconButton
                   icon={<FaThumbsUp />}
@@ -199,13 +219,7 @@ const ChatWindow = ({ chatId }) => {
               />
           )}
           <Box
-              bg={
-                message.sender === "user"
-                    ? buttonBg
-                    : message.isError
-                        ? "red.500"
-                        : "gray.200"
-              }
+              bg={message.sender === "user" ? buttonBg : message.isError ? "red.500" : "gray.200"}
               color={message.sender === "user" || message.isError ? "white" : "black"}
               p={3}
               borderRadius="md"
@@ -227,7 +241,7 @@ const ChatWindow = ({ chatId }) => {
 
   return (
       <Flex direction="column" height="100%" bg="gray.50" w="100%">
-        {/* Top panel with current category information */}
+        {/* Top panel with current category and mode selection */}
         <Box p={4} bg="white" boxShadow="sm" w="100%">
           <Flex justify="space-between" align="center">
             <Heading size="md">
@@ -236,30 +250,35 @@ const ChatWindow = ({ chatId }) => {
                 {selectedCategory}
               </Badge>
             </Heading>
-            <Select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                maxW="300px"
-                variant="filled"
-            >
-              {categories.map((cat, idx) => (
-                  <option key={idx} value={cat}>
-                    {cat}
-                  </option>
-              ))}
-            </Select>
+            <Flex align="center">
+              <Select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  maxW="300px"
+                  variant="filled"
+                  mr={4}
+              >
+                {categories.map((cat, idx) => (
+                    <option key={idx} value={cat}>
+                      {cat}
+                    </option>
+                ))}
+              </Select>
+              <Select
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value)}
+                  maxW="200px"
+                  variant="filled"
+              >
+                <option value="paperqa">PaperQA</option>
+                <option value="direct">Direct Streaming</option>
+              </Select>
+            </Flex>
           </Flex>
         </Box>
 
         {/* Message area */}
-        <VStack
-            spacing={4}
-            flex={1}
-            overflowY="auto"
-            p={4}
-            align="center"
-            w="100%"
-        >
+        <VStack spacing={4} flex={1} overflowY="auto" p={4} align="center" w="100%">
           {messages.map((msg) => renderMessage(msg))}
           {isLoadingResponse && (
               <Flex align="center" justify="center">
@@ -272,7 +291,7 @@ const ChatWindow = ({ chatId }) => {
           <div ref={messagesEndRef} />
         </VStack>
 
-        {/* Document selection component (if needed) */}
+        {/* Document selection component */}
         <DocumentGroups onSelectDocument={() => {}} />
 
         {/* Input panel */}
@@ -304,7 +323,7 @@ const ChatWindow = ({ chatId }) => {
           </Button>
         </Flex>
 
-        {/* Modal for adding message to dataset */}
+        {/* Modal for adding a message to the dataset */}
         <AddToDatasetModal
             isOpen={isOpen}
             onClose={onClose}
