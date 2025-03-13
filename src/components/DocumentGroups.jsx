@@ -57,7 +57,7 @@ const DocumentGroups = ({ onSelectDocument }) => {
   return (
       <Box p={4}>
         <Text mb={2} fontWeight="bold">
-        Choose category:
+        Choose group:
         </Text>
         <Select
             mb={4}

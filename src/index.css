@@ -1,0 +1,6 @@
+.hidden-think {
+    color: gray;
+    font-style: italic;
+    /* Если хотите скрывать содержимое, раскомментируйте строку ниже: */
+    /* display: none; */
+}

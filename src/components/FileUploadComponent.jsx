@@ -23,6 +23,7 @@ import {
   IconButton,
   HStack,
   Divider,
+  Select,
 } from "@chakra-ui/react";
 import { AttachmentIcon, CloseIcon, DeleteIcon, ViewIcon } from "@chakra-ui/icons";
 import { FaFileUpload, FaFile } from "react-icons/fa";
@@ -31,17 +32,19 @@ import axios from "axios";
 const FileUploadComponent = ({ isOpen, onClose }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [description, setDescription] = useState("");
-  // Changed from Select to Input for group
+  // Changed group field to an Input to allow free text entry
   const [group, setGroup] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [documents, setDocuments] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [categories, setCategories] = useState(["All"]);
   const toast = useToast();
 
   useEffect(() => {
     if (isOpen) {
       fetchDocuments();
+      fetchCategories();
     }
   }, [isOpen]);
 
@@ -65,6 +68,17 @@ const FileUploadComponent = ({ isOpen, onClose }) => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await axios.get("http://localhost:8000/categories");
+      if (res.data.categories) {
+        setCategories(["All", ...res.data.categories]);
+      }
+    } catch (error) {
+      console.error("Error fetching categories:", error);
     }
   };
 
@@ -98,6 +112,7 @@ const FileUploadComponent = ({ isOpen, onClose }) => {
     formData.append("file", selectedFile);
     const docDescription = description || selectedFile.name;
     formData.append("description", docDescription);
+    // Pass the entered group name
     formData.append("group", group);
 
     try {
@@ -246,7 +261,7 @@ const FileUploadComponent = ({ isOpen, onClose }) => {
                     isDisabled={isUploading}
                 />
               </FormControl>
-              {/* Changed group dropdown to free text input */}
+              {/* The group field is now a free text input */}
               <FormControl>
                 <FormLabel>Group (Optional)</FormLabel>
                 <Input
@@ -273,52 +288,6 @@ const FileUploadComponent = ({ isOpen, onClose }) => {
               >
                 Upload Document
               </Button>
-              <Divider my={4} />
-              <Text fontSize="lg" fontWeight="bold">
-                Uploaded Documents
-              </Text>
-              {isLoading ? (
-                  <Flex justify="center" py={6}>
-                    <Spinner />
-                  </Flex>
-              ) : documents.length === 0 ? (
-                  <Text color="gray.500" textAlign="center" py={6}>
-                    No documents uploaded yet
-                  </Text>
-              ) : (
-                  <List spacing={2}>
-                    {documents.map((doc) => (
-                        <ListItem key={doc.id} borderWidth="1px" borderRadius="md" p={2}>
-                          <HStack justify="space-between">
-                            <HStack>
-                              <Icon as={FaFile} color="blue.500" />
-                              <Text fontWeight="medium" isTruncated maxW="200px">
-                                {doc.name || doc.citation}
-                              </Text>
-                              <Badge colorScheme={doc.source === "paperqa" ? "green" : "blue"}>
-                                {doc.source}
-                              </Badge>
-                            </HStack>
-                            <HStack>
-                              <IconButton
-                                  icon={<ViewIcon />}
-                                  size="sm"
-                                  aria-label="View document"
-                                  onClick={() => handleViewDocument(doc.id)}
-                              />
-                              <IconButton
-                                  icon={<DeleteIcon />}
-                                  size="sm"
-                                  colorScheme="red"
-                                  aria-label="Delete document"
-                                  onClick={() => handleDeleteDocument(doc.id)}
-                              />
-                            </HStack>
-                          </HStack>
-                        </ListItem>
-                    ))}
-                  </List>
-              )}
             </VStack>
           </DrawerBody>
           <DrawerFooter borderTopWidth="1px">

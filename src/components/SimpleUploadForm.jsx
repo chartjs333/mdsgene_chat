@@ -19,7 +19,6 @@ import {
   ListItem,
   Badge,
   Flex,
-  Select,
 } from "@chakra-ui/react";
 import { CloseIcon, DeleteIcon, ViewIcon } from "@chakra-ui/icons";
 import { FaFileUpload, FaFile } from "react-icons/fa";
@@ -28,6 +27,7 @@ import axios from "axios";
 const SimpleUploadForm = ({ onUploadComplete }) => {
   const [file, setFile] = useState(null);
   const [description, setDescription] = useState("");
+  // Change group to a free text input
   const [group, setGroup] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [response, setResponse] = useState(null);
@@ -35,7 +35,6 @@ const SimpleUploadForm = ({ onUploadComplete }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [documents, setDocuments] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [categories, setCategories] = useState(["All"]);
   const toast = useToast();
 
   useEffect(() => {
@@ -65,17 +64,6 @@ const SimpleUploadForm = ({ onUploadComplete }) => {
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const res = await axios.get("http://localhost:8000/categories");
-      if (res.data.categories) {
-        setCategories(["All", ...res.data.categories]);
-      }
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-    }
-  };
-
   const handleFileChange = (e) => {
     if (e.target.files.length > 0) {
       setFile(e.target.files[0]);
@@ -90,7 +78,7 @@ const SimpleUploadForm = ({ onUploadComplete }) => {
     setGroup(e.target.value);
   };
 
-  const handleUpload = async () => {
+  const handleUpload = async (e) => {
     if (!file) {
       toast({
         title: "No file selected",
@@ -102,21 +90,21 @@ const SimpleUploadForm = ({ onUploadComplete }) => {
     }
 
     setIsUploading(true);
+    setResponse(null);
+    setError(null);
     setUploadProgress(0);
 
     const formData = new FormData();
     formData.append("file", file);
     formData.append("description", description || "No description");
+    // Pass the free-text group name
     formData.append("group", group);
 
     try {
-      const response = await axios.post(
+      const res = await axios.post(
           "http://localhost:8000/upload_document",
           formData,
           {
-            headers: {
-              "Content-Type": undefined,
-            },
             onUploadProgress: (progressEvent) => {
               const percentage = Math.round(
                   (progressEvent.loaded * 100) / progressEvent.total
@@ -126,10 +114,10 @@ const SimpleUploadForm = ({ onUploadComplete }) => {
           }
       );
 
-      setResponse(response.data);
+      setResponse(res.data);
       toast({
-        title: "Document uploaded",
-        description: response.data.message || "Document successfully uploaded",
+        title: "Success",
+        description: "Document uploaded successfully",
         status: "success",
         duration: 3000,
         isClosable: true,
@@ -199,8 +187,8 @@ const SimpleUploadForm = ({ onUploadComplete }) => {
   };
 
   const handleUploadWithCallback = async (e) => {
+    e && e.preventDefault();
     await handleUpload(e);
-    await fetchDocuments();
     if (onUploadComplete && typeof onUploadComplete === "function" && !error) {
       onUploadComplete();
     }
@@ -248,24 +236,20 @@ const SimpleUploadForm = ({ onUploadComplete }) => {
               <FormLabel>Description (Optional)</FormLabel>
               <Input
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={handleDescriptionChange}
                   placeholder="Enter document description"
                   disabled={isUploading}
               />
             </FormControl>
+            {/* Replace the Select with an Input to allow free text for new groups */}
             <FormControl>
               <FormLabel>Group (Optional)</FormLabel>
-              <Select
+              <Input
                   value={group}
-                  onChange={(e) => setGroup(e.target.value)}
-                  placeholder="Select a group"
-              >
-                {categories.map((cat, idx) => (
-                    <option key={idx} value={cat}>
-                      {cat}
-                    </option>
-                ))}
-              </Select>
+                  onChange={handleGroupChange}
+                  placeholder="Enter group name"
+                  disabled={isUploading}
+              />
             </FormControl>
             <Button
                 type="submit"
@@ -279,25 +263,30 @@ const SimpleUploadForm = ({ onUploadComplete }) => {
             </Button>
           </VStack>
         </Box>
+
         {isUploading && (
             <Box>
               <Text mb={1}>Upload Progress: {uploadProgress}%</Text>
               <Progress value={uploadProgress} size="sm" colorScheme="blue" />
             </Box>
         )}
+
         {error && (
             <Alert status="error">
               <AlertIcon />
               <Text>{error}</Text>
             </Alert>
         )}
+
         {response && !error && (
             <Alert status="success">
               <AlertIcon />
               <Text>Document successfully uploaded!</Text>
             </Alert>
         )}
+
         <Divider my={2} />
+
         <Box>
           <Heading size="sm" mb={3}>Uploaded Documents</Heading>
           {isLoading ? (
@@ -316,6 +305,9 @@ const SimpleUploadForm = ({ onUploadComplete }) => {
                           </Text>
                           <Badge colorScheme={doc.source === "paperqa" ? "green" : "blue"}>
                             {doc.source}
+                    </Badge>
+                    <Badge ml={2} colorScheme="purple">
+                      Group: {doc.group || "Without group"}
                           </Badge>
                         </HStack>
                         <HStack>
