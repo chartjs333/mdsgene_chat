@@ -25,7 +25,7 @@ const DocumentGroups = ({ onSelectDocument }) => {
   const fetchDocuments = async (category = "All") => {
     setIsLoading(true);
     try {
-      const response = await axios.get("http://localhost:8000/documents", {
+      const response = await axios.get("http://34.32.174.67:8000/documents", {
         params: category !== "All" ? { group: category } : {},
       });
       let allDocs = [];

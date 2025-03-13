@@ -36,7 +36,7 @@ const DatasetManager = () => {
     const fetchDataset = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch("http://localhost:8000/dataset");
+            const res = await fetch("http://34.32.174.67:8000/dataset");
             const data = await res.json();
             setDataset(data.items);
         } catch (error) {
@@ -58,7 +58,7 @@ const DatasetManager = () => {
 
     const handleDelete = async (id) => {
         try {
-            const res = await fetch(`http://localhost:8000/dataset/${id}`, {
+            const res = await fetch(`http://34.32.174.67:8000/dataset/${id}`, {
                 method: "DELETE",
             });
             if (!res.ok) {
@@ -96,7 +96,7 @@ const DatasetManager = () => {
                 content: editContent,
                 additionalInfo: editAdditional,
             };
-            const res = await fetch(`http://localhost:8000/dataset/${currentEditItem.id}`, {
+            const res = await fetch(`http://34.32.174.67:8000/dataset/${currentEditItem.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(updatedItem),

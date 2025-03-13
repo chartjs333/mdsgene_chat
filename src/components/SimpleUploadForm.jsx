@@ -44,7 +44,7 @@ const SimpleUploadForm = ({ onUploadComplete }) => {
   const fetchDocuments = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get("http://localhost:8000/documents");
+      const response = await axios.get("http://34.32.174.67:8000/documents");
       let allDocs = [];
       if (response.data.documents) {
         allDocs = response.data.documents;
@@ -102,7 +102,7 @@ const SimpleUploadForm = ({ onUploadComplete }) => {
 
     try {
       const res = await axios.post(
-          "http://localhost:8000/upload_document",
+          "http://34.32.174.67:8000/upload_document",
           formData,
           {
             onUploadProgress: (progressEvent) => {
@@ -144,7 +144,7 @@ const SimpleUploadForm = ({ onUploadComplete }) => {
 
   const handleDeleteDocument = async (docId) => {
     try {
-      await axios.delete(`http://localhost:8000/documents/${docId}`);
+      await axios.delete(`http://34.32.174.67:8000/documents/${docId}`);
       toast({
         title: "Document deleted",
         status: "success",
@@ -166,7 +166,7 @@ const SimpleUploadForm = ({ onUploadComplete }) => {
 
   const handleViewDocument = async (docId) => {
     try {
-      const response = await axios.get(`http://localhost:8000/document/${docId}`);
+      const response = await axios.get(`http://34.32.174.67:8000/document/${docId}`);
       toast({
         title: response.data.name,
         description: response.data.preview.slice(0, 100) + "...",

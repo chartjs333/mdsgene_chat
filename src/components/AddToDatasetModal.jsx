@@ -27,7 +27,7 @@ const AddToDatasetModal = ({ isOpen, onClose, content, onConfirm }) => {
         };
 
         try {
-            const res = await fetch("http://localhost:8000/add_to_dataset", {
+            const res = await fetch("http://34.32.174.67:8000/add_to_dataset", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(datasetItem),

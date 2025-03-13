@@ -30,7 +30,7 @@ const DocumentReference = ({ onSelectDocument }) => {
     const fetchDocuments = async () => {
         setIsLoading(true);
         try {
-            const response = await axios.get("http://localhost:8000/documents");
+            const response = await axios.get("http://34.32.174.67:8000/documents");
             let allDocs = [];
 
             if (response.data.documents) {
@@ -47,7 +47,7 @@ const DocumentReference = ({ onSelectDocument }) => {
 
     const handleSelectDocument = async (docId) => {
         try {
-            const response = await axios.get(`http://localhost:8000/document/${docId}`);
+            const response = await axios.get(`http://34.32.174.67:8000/document/${docId}`);
             if (onSelectDocument && response.data) {
                 onSelectDocument(response.data);
             }

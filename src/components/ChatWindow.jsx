@@ -89,7 +89,7 @@ const ChatWindow = ({ chatId }) => {
     // Fetch categories from the backend
     const fetchCategories = async () => {
       try {
-        const res = await fetch("http://localhost:8000/categories");
+        const res = await fetch("http://34.32.174.67:8000/categories");
         const data = await res.json();
         if (data.categories) {
           setCategories(["All", ...data.categories]);
@@ -116,7 +116,7 @@ const ChatWindow = ({ chatId }) => {
 
     try {
       const response = await fetch(
-          `http://localhost:8000/ai_prompt?prompt=${encodeURIComponent(query)}&use_docs=true&category=${selectedCategory}`
+          `http://34.32.174.67:8000/ai_prompt?prompt=${encodeURIComponent(query)}&use_docs=true&category=${selectedCategory}`
       );
       const data = await response.json();
       const aiMessage = { id: Date.now(), text: data.response, sender: "ai", category: selectedCategory };
@@ -138,7 +138,7 @@ const ChatWindow = ({ chatId }) => {
     const query = input;
     setInput("");
     const eventSource = new EventSource(
-        `http://localhost:8000/ai_prompt_stream?prompt=${encodeURIComponent(query)}&use_docs=true&category=${selectedCategory}`
+        `http://34.32.174.67:8000/ai_prompt_stream?prompt=${encodeURIComponent(query)}&use_docs=true&category=${selectedCategory}`
     );
 
     let aggregatedResponse = "";
