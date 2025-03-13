@@ -9,13 +9,12 @@ import {
   useDisclosure,
   IconButton,
   Image,
-  Spacer,
 } from "@chakra-ui/react";
 import { HamburgerIcon, AttachmentIcon } from "@chakra-ui/icons";
 import { FaUser } from "react-icons/fa";
 import Sidebar from "components/Sidebar";
 import ChatWindow from "components/ChatWindow";
-import SimpleUploadForm from "components/SimpleUploadForm"; // Import the simple upload form component
+import SimpleUploadForm from "components/SimpleUploadForm";
 
 const Home = () => {
   const [chats, setChats] = useState([]);
@@ -37,14 +36,13 @@ const Home = () => {
   const handleSelectChat = (chatId) => {
     setCurrentChat(chatId);
     if (window.innerWidth < 768) {
-      onSidebarClose(); // Close sidebar on mobile devices only
+      onSidebarClose();
     }
   };
 
   return (
     <ChakraProvider>
       <Box height="100vh" bg={bgColor}>
-        {/* Custom Header */}
         <Flex
           alignItems="center"
           justifyContent="space-between"
@@ -61,11 +59,8 @@ const Home = () => {
             _hover={{ bg: buttonHoverBg }}
             aria-label="Open sidebar"
           />
-          <Flex alignItems="center" gap={2}>
-            <Image src="logo.png" w="200px" />
-          </Flex>
+          <Image src="logo.png" w="200px" />
           <Flex>
-            {/* Document Upload Button */}
             <IconButton
               icon={<AttachmentIcon />}
               variant="ghost"
@@ -86,7 +81,6 @@ const Home = () => {
         </Flex>
 
         <Flex h="calc(100vh - 60px)">
-          {/* Sidebar Drawer */}
           <Drawer
             isOpen={isSidebarOpen}
             placement="left"
@@ -103,12 +97,10 @@ const Home = () => {
             </DrawerContent>
           </Drawer>
 
-          {/* Main Chat Window */}
           <Box flex={1} overflow="hidden">
             <ChatWindow chatId={currentChat} />
           </Box>
 
-          {/* Document Upload Drawer */}
           <Drawer
             isOpen={isUploadOpen}
             placement="right"

@@ -60,10 +60,7 @@ const NotFound = () => {
           mb="5"
           as="h2"
         >
-          Not found{" "}
-          <Box fontWeight="light" as="span">
-            404
-          </Box>
+          Not found <Box fontWeight="light" as="span">404</Box>
         </Heading>
       </Flex>
     </Flex>

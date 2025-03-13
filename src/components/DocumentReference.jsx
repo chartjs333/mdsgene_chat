@@ -30,18 +30,11 @@ const DocumentReference = ({ onSelectDocument }) => {
     const fetchDocuments = async () => {
         setIsLoading(true);
         try {
-            const response = await axios.get("http://34.90.8.7:8000/documents");
-
-            // Format data from the server response
+            const response = await axios.get("http://localhost:8000/documents");
             let allDocs = [];
 
             if (response.data.documents) {
                 allDocs = response.data.documents;
-            } else {
-                // Fallback handling if structure is different
-                const backupDocs = response.data.backup_docs || [];
-                const paperqaDocs = response.data.paperqa_docs || [];
-                allDocs = [...backupDocs, ...paperqaDocs];
             }
 
             setDocuments(allDocs);
@@ -54,7 +47,7 @@ const DocumentReference = ({ onSelectDocument }) => {
 
     const handleSelectDocument = async (docId) => {
         try {
-            const response = await axios.get(`http://34.90.8.7:8000/document/${docId}`);
+            const response = await axios.get(`http://localhost:8000/document/${docId}`);
             if (onSelectDocument && response.data) {
                 onSelectDocument(response.data);
             }

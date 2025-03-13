@@ -1,5 +1,5 @@
-import axios from "axios";
 import React, { useState, useEffect, useRef } from "react";
+import axios from "axios";
 import {
   Box,
   VStack,
@@ -10,15 +10,15 @@ import {
   Icon,
   IconButton,
   useColorModeValue,
-  HStack,
   Card,
   CardBody,
   Badge,
+  Select,
 } from "@chakra-ui/react";
 import { EditIcon, LinkIcon, CloseIcon } from "@chakra-ui/icons";
 import { FaPaperPlane } from "react-icons/fa";
 import ResponseActions from "./ResponseActions";
-import DocumentReference from "./DocumentReference";
+import DocumentGroups from "./DocumentGroups";
 
 const ChatWindow = ({ chatId }) => {
   const [messages, setMessages] = useState([]);
@@ -27,6 +27,10 @@ const ChatWindow = ({ chatId }) => {
   const [isTyping, setIsTyping] = useState(false);
   const [isSimulatingTyping, setIsSimulatingTyping] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  // Instead of predefined options, we rely entirely on the dynamic list.
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [categories, setCategories] = useState(["All"]);
+
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -43,76 +47,79 @@ const ChatWindow = ({ chatId }) => {
     }
   }, [input]);
 
+  // Fetch available categories from the server
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await axios.get("http://localhost:8000/categories");
+        if (res.data.categories) {
+          // Prepend "All" as the default option
+          setCategories(["All", ...res.data.categories]);
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    fetchCategories();
+  }, []);
+
   const handleSelectDocument = (document) => {
     setSelectedDocument(document);
   };
 
   const sendMessage = async () => {
     if (input.trim()) {
-      if (editingId) {
-        setMessages(
-            messages.map((msg) =>
-                msg.id === editingId ? { ...msg, text: input } : msg
-            )
-        );
-        setEditingId(null);
-      } else {
-        let messageContent = input;
+      const newUserMessage = {
+        id: Date.now(),
+        text: input,
+        sender: "user",
+        documentRef: selectedDocument
+            ? {
+              id: selectedDocument.id,
+              name: selectedDocument.name,
+              group: selectedDocument.group || "Without group",
+            }
+            : null,
+        category: selectedCategory,
+      };
 
-        // Create user message with document reference if selected
-        const newUserMessage = {
+      setMessages((prevMessages) => [...prevMessages, newUserMessage]);
+      setIsTyping(true);
+
+      try {
+        const response = await axios.get("http://localhost:8000/ai_prompt", {
+          params: {
+            prompt: input,
+            use_docs: true,
+            category: selectedCategory,
+          },
+        });
+        const responseData = response.data;
+        const responseText =
+            typeof responseData === "string"
+                ? responseData
+                : responseData.response || JSON.stringify(responseData);
+        const newAIMessage = {
           id: Date.now(),
-          text: messageContent,
-          sender: "user",
-          documentRef: selectedDocument ? {
-            id: selectedDocument.id,
-            name: selectedDocument.name
-          } : null
+          text: responseText,
+          sender: "ai",
+          source:
+              typeof responseData === "object" ? responseData.source : "api",
         };
-
-        setMessages((prevMessages) => [...prevMessages, newUserMessage]);
-        setIsTyping(true);
-
-        try {
-          // We're using a GET request as confirmed to work with your backend
-          const response = await axios.get(
-            "http://34.90.8.7:8000/ai_prompt",
-              {
-              params: {
-                prompt: input,
-                use_docs: true // Use documents by default
-              },
-              }
-          );
-
-          // Process response
-          const responseData = response.data;
-          const responseText = typeof responseData === 'string'
-            ? responseData
-            : (responseData.response || JSON.stringify(responseData));
-
-          const newAIMessage = {
-            id: Date.now(),
-            text: responseText,
-            sender: "ai",
-            source: typeof responseData === 'object' ? responseData.source : "api"
-          };
-          setMessages((prevMessages) => [...prevMessages, newAIMessage]);
-        } catch (error) {
-          console.error("Error sending message to AI API:", error);
-          // Add error message to chat
-          const errorMessage = {
-            id: Date.now(),
-            text: `Error: ${error.message || "Failed to get response"}`,
-            sender: "ai",
-            isError: true
-          };
-          setMessages((prevMessages) => [...prevMessages, errorMessage]);
-        } finally {
-          setIsTyping(false);
-          setSelectedDocument(null); // Clear selected document after sending
-          setInput(""); // Clear input after sending
-        }
+        setMessages((prevMessages) => [...prevMessages, newAIMessage]);
+      } catch (error) {
+        console.error("Error sending message to AI API:", error);
+        const errorMessage = {
+          id: Date.now(),
+          text: `Error: ${error.message || "Failed to get response"}`,
+          sender: "ai",
+          isError: true,
+        };
+        setMessages((prevMessages) => [...prevMessages, errorMessage]);
+      } finally {
+        setIsTyping(false);
+        setSelectedDocument(null);
+        setInput("");
       }
     }
   };
@@ -124,20 +131,13 @@ const ChatWindow = ({ chatId }) => {
     }
   };
 
-  // Sample patient profile simulation
   const simulateTyping = () => {
     if (isSimulatingTyping) return;
-
-    const textToType = ` Patient Profile:
+    const textToType = `Patient Profile:
 Age: 42 years old
 * Symptoms:
-* Dystonia, limb: The patient reports experiencing involuntary muscle contractions causing repetitive movements or abnormal postures in the limbs.
-* Bradykinesia: There is a noticeable slowness in the initiation and execution of movement.
-* Resting tremor: The patient has observed tremors in the hands that are most prominent at rest and decrease with voluntary movements.
-* Rigidity, leg: The patient feels stiffness in the legs that is not dependent on the angle of joint movement.`;
-
-    // Instead of simulating character-by-character typing (which seems to cause issues),
-    // let's just set the full text at once
+* Dystonia, limb: The patient reports experiencing involuntary muscle contractions...
+    `;
     setInput(textToType);
   };
 
@@ -148,6 +148,21 @@ Age: 42 years old
 
   return (
       <Flex flexDirection="column" height="100%">
+        {/* Category selector */}
+        <Box p={4}>
+          <Select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              maxW="300px"
+          >
+            {categories.map((cat, idx) => (
+                <option key={idx} value={cat}>
+                  {cat}
+                </option>
+            ))}
+          </Select>
+        </Box>
+
         <VStack
             spacing={4}
             align="stretch"
@@ -156,7 +171,6 @@ Age: 42 years old
             p={4}
             maxW="800px"
             mx="auto"
-            w="-webkit-fill-available"
         >
           {messages.map((message) => (
               <Box
@@ -174,38 +188,50 @@ Age: 42 years old
                         transform="translateY(-50%)"
                         opacity={0.5}
                         _hover={{ opacity: 1 }}
-                onClick={() => {
-                  setEditingId(message.id);
-                  setInput(message.text);
-                }}
+                        onClick={() => {
+                          setEditingId(message.id);
+                          setInput(message.text);
+                        }}
                     />
                 )}
                 <Box
-              bg={message.sender === "user" ? "blue.500" : message.isError ? "red.500" : "gray.200"}
-              color={message.sender === "user" || message.isError ? "white" : "black"}
-              p={3}
+                    bg={
+                      message.sender === "user"
+                          ? "blue.500"
+                          : message.isError
+                              ? "red.500"
+                              : "gray.200"
+                    }
+                    color={message.sender === "user" || message.isError ? "white" : "black"}
+                    p={3}
                     borderRadius="md"
                     whiteSpace="pre-wrap"
-              maxW="90%"
+                    maxW="90%"
                 >
                   <Text>{message.text}</Text>
-
-              {/* Show document reference badge if exists */}
-              {message.documentRef && (
-                <Flex
-                  mt={2}
-                  p={1}
-                  bg={documentRefBg}
-                  borderRadius="md"
-                  alignItems="center"
-                  fontSize="sm"
-                >
-                  <Icon as={LinkIcon} mr={1} />
-                  <Text>Document: {message.documentRef.name}</Text>
-                </Flex>
-              )}
+                  {message.documentRef && (
+                      <Flex
+                          mt={2}
+                          p={1}
+                          bg={documentRefBg}
+                          borderRadius="md"
+                          alignItems="center"
+                          fontSize="sm"
+                      >
+                        <Icon as={LinkIcon} mr={1} />
+                        <Text>
+                          Document: {message.documentRef.name} (
+                          {message.documentRef.group || "Without group"})
+                        </Text>
+                      </Flex>
+                  )}
+                  {message.category && (
+                      <Badge mt={1} colorScheme="purple">
+                        Category: {message.category}
+                      </Badge>
+                  )}
                 </Box>
-            {message.sender === "ai" && !isTyping && !message.isError && (
+                {message.sender === "ai" && !isTyping && !message.isError && (
                     <ResponseActions responseText={message.text} />
                 )}
               </Box>
@@ -218,32 +244,29 @@ Age: 42 years old
           <div ref={messagesEndRef} />
         </VStack>
 
-      {/* Selected document preview */}
-      {selectedDocument && (
-        <Card size="sm" mx={4} mb={2} bg={documentRefBg}>
-          <CardBody py={2}>
-            <Flex justifyContent="space-between" alignItems="center">
-              <Flex alignItems="center">
-                <Icon as={LinkIcon} mr={2} />
-                <Text fontWeight="medium">
-                  Using document: {selectedDocument.name}
-                </Text>
-                {selectedDocument.source && (
-                  <Badge ml={2} colorScheme={selectedDocument.source === "paperqa" ? "green" : "blue"}>
-                    {selectedDocument.source}
-                  </Badge>
-                )}
-              </Flex>
-              <IconButton
-                icon={<CloseIcon />}
-                size="xs"
-                aria-label="Clear document selection"
-                onClick={() => setSelectedDocument(null)}
-              />
-            </Flex>
-          </CardBody>
-        </Card>
-      )}
+        <DocumentGroups onSelectDocument={handleSelectDocument} />
+
+        {selectedDocument && (
+            <Card size="sm" mx={4} mb={2} bg={documentRefBg}>
+              <CardBody py={2}>
+                <Flex justifyContent="space-between" alignItems="center">
+                  <Flex alignItems="center">
+                    <Icon as={LinkIcon} mr={2} />
+                    <Text fontWeight="medium">
+                      Using document: {selectedDocument.name} (
+                      {selectedDocument.group || "Without group"})
+                    </Text>
+                  </Flex>
+                  <IconButton
+                      icon={<CloseIcon />}
+                      size="xs"
+                      aria-label="Clear document selection"
+                      onClick={() => setSelectedDocument(null)}
+                  />
+                </Flex>
+              </CardBody>
+            </Card>
+        )}
 
         <Flex p={4} borderTop="1px" borderColor="gray.200" alignItems="flex-end">
           <Textarea
@@ -251,9 +274,7 @@ Age: 42 years old
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={
-                editingId ? "Edit your message..." : "Message MDSGene AI..."
-              }
+              placeholder={editingId ? "Edit your message..." : "Message MDSGene AI..."}
               mr={2}
               rows={1}
               minHeight="40px"
@@ -261,10 +282,8 @@ Age: 42 years old
               resize="none"
               overflowY="auto"
               readOnly={isSimulatingTyping}
-          onClick={simulateTyping}
+              onClick={simulateTyping}
           />
-        <VStack alignItems="stretch" spacing={2}>
-          <DocumentReference onSelectDocument={handleSelectDocument} />
           <Button
               onClick={sendMessage}
               bg={buttonBg}
@@ -276,7 +295,6 @@ Age: 42 years old
           >
             <Icon as={FaPaperPlane} />
           </Button>
-        </VStack>
         </Flex>
       </Flex>
   );

@@ -6,30 +6,25 @@ import {
 } from "react-router-dom";
 import routes from "./configs";
 import NotFound from "./NotFound.jsx";
-// import Navbar from "../components/ChatWindow.jsx";
 
 export const RouterProvider = BrowserRouter;
 
 const Routes = () => {
   return (
-    <>
-      {/* <Navbar /> */}
-
-      <RouterRoutes>
-        {routes.map(({ path, exact, Component, secured, Layout }) => (
-          <ReactRoute
-            key="path"
-            path={path}
-            element={
-              <Layout>
-                <Component />
-              </Layout>
-            }
-          />
-        ))}
-        <ReactRoute path="*" element={<NotFound />} />
-      </RouterRoutes>
-    </>
+    <RouterRoutes>
+      {routes.map(({ path, exact, Component, Layout }) => (
+        <ReactRoute
+          key={path}
+          path={path}
+          element={
+            <Layout>
+              <Component />
+            </Layout>
+          }
+        />
+      ))}
+      <ReactRoute path="*" element={<NotFound />} />
+    </RouterRoutes>
   );
 };
 
